@@ -5,11 +5,13 @@ const SPEED = 5.0
 const JUMP_VELOCITY = 4.5
 const JAB_DURATION = 0.3
 
-@onready var camera := get_viewport().get_camera_3d()
-
 enum State {IDLE, MOVE, JUMP, FALL, LAND, ATTACK}
+@onready var camera := get_viewport().get_camera_3d()
 var state := State.IDLE
 var attack_timer := 0.0
+var combo_count := 0
+var attack_buffered := false
+
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
@@ -35,6 +37,7 @@ func _physics_process(delta: float) -> void:
 			
 			if Input.is_action_just_pressed("attack") and is_on_floor():
 				attack_timer = JAB_DURATION
+				combo_count = 1
 				state = State.ATTACK
 		State.IDLE:
 			velocity.x = 0
@@ -52,6 +55,7 @@ func _physics_process(delta: float) -> void:
 			
 			if Input.is_action_just_pressed("attack") and is_on_floor():
 				attack_timer = JAB_DURATION
+				combo_count = 1
 				state = State.ATTACK
 		State.JUMP:
 			velocity.x = direction.x * SPEED
@@ -75,7 +79,19 @@ func _physics_process(delta: float) -> void:
 
 			attack_timer -= delta
 
+			if Input.is_action_just_pressed("attack") and is_on_floor():
+				attack_buffered = true
+
 			if attack_timer <= 0:
-				state = State.IDLE
+				if attack_buffered and combo_count < 3:
+					combo_count += 1
+					attack_timer = JAB_DURATION
+					attack_buffered = false
+				else:
+					combo_count = 0
+					attack_buffered = false
+					state = State.IDLE
+	
+	print(state)
 
 	move_and_slide()
