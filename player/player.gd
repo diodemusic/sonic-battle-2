@@ -25,16 +25,19 @@ const MOVES = {
 		"launch_force" = 7.0,
 	},
 }
+const MAX_HP := 100
+const HEAL_RATE = 30.0
 
 var state := State.IDLE
 var attack_timer := 0.0
 var combo_count := 0
 var attack_buffered := false
-var hp := 100
+var hp := MAX_HP
 var keys := {}
 var launched := false
+var heal_buffer = 0.0
 
-enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD}
+enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL}
 
 @onready var camera := get_viewport().get_camera_3d()
 @export var input_prefix := "p1_"
@@ -104,7 +107,8 @@ func _ready() -> void:
 		"attack_jab": input_prefix + "attack_jab",
 		"attack_heavy": input_prefix + "attack_heavy",
 		"attack_upper": input_prefix + "attack_upper",
-		"guard": input_prefix + "guard"
+		"guard": input_prefix + "guard",
+		"heal": input_prefix + "heal"
 	}
 
 	$Hitbox.area_entered.connect(_on_hitbox_area_entered)
@@ -144,6 +148,8 @@ func _physics_process(delta: float) -> void:
 				state = State.UPPER
 			elif Input.is_action_pressed(keys["guard"]):
 				state = State.GUARD
+			elif Input.is_action_pressed(keys["heal"]):
+				state = State.HEAL
 		State.IDLE:
 			velocity.x = 0
 			velocity.z = 0
@@ -170,6 +176,8 @@ func _physics_process(delta: float) -> void:
 				state = State.UPPER
 			elif Input.is_action_pressed(keys["guard"]):
 				state = State.GUARD
+			elif Input.is_action_pressed(keys["heal"]):
+				state = State.HEAL
 		State.JUMP:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
@@ -231,7 +239,18 @@ func _physics_process(delta: float) -> void:
 
 			if not Input.is_action_pressed(keys["guard"]):
 				state = State.IDLE
+		State.HEAL:
+			velocity.x = 0
+			velocity.z = 0
+			heal_buffer += HEAL_RATE * delta
+			var whole := int(heal_buffer)
 
-	# print(State.keys()[state])
+			if whole > 0:
+				hp = min(hp + whole, MAX_HP)
+				heal_buffer -= whole
+
+			if not Input.is_action_pressed(keys["heal"]):
+				heal_buffer = 0.0
+				state = State.IDLE
 
 	move_and_slide()
