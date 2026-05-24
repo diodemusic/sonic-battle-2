@@ -34,7 +34,7 @@ var hp := 100
 var keys := {}
 var launched := false
 
-enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT}
+enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD}
 
 @onready var camera := get_viewport().get_camera_3d()
 @export var input_prefix := "p1_"
@@ -52,6 +52,9 @@ func _tick_attack(stats: Dictionary, delta: float) -> bool:
 
 
 func take_damage(amount: int, knockback: Vector3) -> void:
+	if state == State.GUARD:
+		return # no
+
 	hp -= amount
 	velocity = knockback
 	launched = knockback.y > 0
@@ -100,7 +103,8 @@ func _ready() -> void:
 		"jump": input_prefix + "jump",
 		"attack_jab": input_prefix + "attack_jab",
 		"attack_heavy": input_prefix + "attack_heavy",
-		"attack_upper": input_prefix + "attack_upper"
+		"attack_upper": input_prefix + "attack_upper",
+		"guard": input_prefix + "guard"
 	}
 
 	$Hitbox.area_entered.connect(_on_hitbox_area_entered)
@@ -120,26 +124,26 @@ func _physics_process(delta: float) -> void:
 
 			if not direction:
 				state = State.IDLE
-			
-			if Input.is_action_just_pressed(keys["jump"]) and is_on_floor():
-				velocity.y = JUMP_VELOCITY
-				state = State.JUMP
 
 			if not is_on_floor():
 				state = State.FALL
+				return
 			
-			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
+			if Input.is_action_just_pressed(keys["jump"]):
+				velocity.y = JUMP_VELOCITY
+				state = State.JUMP
+			elif Input.is_action_just_pressed(keys["attack_jab"]):
 				attack_timer = MOVES[State.JAB]["duration"]
 				combo_count = 1
 				state = State.JAB
-
-			if Input.is_action_just_pressed(keys["attack_heavy"]) and is_on_floor():
+			elif Input.is_action_just_pressed(keys["attack_heavy"]):
 				attack_timer = MOVES[State.HEAVY]["duration"]
 				state = State.HEAVY
-			
-			if Input.is_action_just_pressed(keys["attack_upper"]) and is_on_floor():
+			elif Input.is_action_just_pressed(keys["attack_upper"]):
 				attack_timer = MOVES[State.UPPER]["duration"]
 				state = State.UPPER
+			elif Input.is_action_pressed(keys["guard"]):
+				state = State.GUARD
 		State.IDLE:
 			velocity.x = 0
 			velocity.z = 0
@@ -147,25 +151,25 @@ func _physics_process(delta: float) -> void:
 			if direction:
 				state = State.MOVE
 			
-			if Input.is_action_just_pressed(keys["jump"]) and is_on_floor():
-				velocity.y = JUMP_VELOCITY
-				state = State.JUMP
-			
 			if not is_on_floor():
 				state = State.FALL
+				return
 			
-			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
+			if Input.is_action_just_pressed(keys["jump"]):
+				velocity.y = JUMP_VELOCITY
+				state = State.JUMP
+			elif Input.is_action_just_pressed(keys["attack_jab"]):
 				attack_timer = MOVES[State.JAB]["duration"]
 				combo_count = 1
 				state = State.JAB
-
-			if Input.is_action_just_pressed(keys["attack_heavy"]) and is_on_floor():
+			elif Input.is_action_just_pressed(keys["attack_heavy"]):
 				attack_timer = MOVES[State.HEAVY]["duration"]
 				state = State.HEAVY
-			
-			if Input.is_action_just_pressed(keys["attack_upper"]) and is_on_floor():
+			elif Input.is_action_just_pressed(keys["attack_upper"]):
 				attack_timer = MOVES[State.UPPER]["duration"]
 				state = State.UPPER
+			elif Input.is_action_pressed(keys["guard"]):
+				state = State.GUARD
 		State.JUMP:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
@@ -221,6 +225,12 @@ func _physics_process(delta: float) -> void:
 					velocity.x = 0
 					velocity.z = 0
 					state = State.IDLE
+		State.GUARD:
+			velocity.x = 0
+			velocity.z = 0
+
+			if not Input.is_action_pressed(keys["guard"]):
+				state = State.IDLE
 
 	# print(State.keys()[state])
 
