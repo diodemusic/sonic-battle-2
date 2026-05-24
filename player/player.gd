@@ -7,8 +7,10 @@ const JAB_DURATION = 0.25
 const HEAVY_DURATION = 0.55
 const UPPER_DURATION = 0.5
 const JAB_STARTUP = 0.05
-const KNOCKBACK_FORCE = 8.0
-const HURT_DURATION = 0.2
+const KNOCKBACK_FORCE = 10.0
+const HURT_DURATION = 0.25
+const JAB_DAMAGE = 5
+const FINISHER_DAMAGE = 15
 
 var state := State.IDLE
 var attack_timer := 0.0
@@ -40,13 +42,15 @@ func _on_hitbox_area_entered(area: Area3D) -> void:
 		return # stop hitting yourself lol
 	
 	var knockback := Vector3.ZERO
+	var damage := JAB_DAMAGE
 
 	if combo_count == 3:
+		damage = FINISHER_DAMAGE
 		var dir := opponent.global_position - global_position
 		dir.y = 0
 		knockback = dir.normalized() * KNOCKBACK_FORCE
 
-	opponent.take_damage(10, knockback)
+	opponent.take_damage(damage, knockback)
 
 
 func _ready() -> void:
