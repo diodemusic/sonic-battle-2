@@ -6,6 +6,10 @@
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_oul6g"]
 
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_oul6g"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_oul6g"]
+
 [node name="Player" type="CharacterBody3D" unique_id=1208118000]
 script = ExtResource("1_oul6g")
 
@@ -14,3 +18,19 @@ shape = SubResource("CapsuleShape3D_kqu6x")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1314026468]
 mesh = SubResource("CapsuleMesh_oul6g")
+
+[node name="Hurtbox" type="Area3D" parent="." unique_id=1336761652]
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox" unique_id=405271519]
+shape = SubResource("CapsuleShape3D_oul6g")
+
+[node name="Hitbox" type="Area3D" parent="." unique_id=496912345]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.75, 0, 0)
+collision_layer = 0
+collision_mask = 4
+monitoring = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hitbox" unique_id=1499167039]
+shape = SubResource("BoxShape3D_oul6g")
