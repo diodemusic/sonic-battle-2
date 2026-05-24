@@ -19,7 +19,11 @@ size = 10.0
 transform = Transform3D(1, 0, 0, 0, 0.70710677, 0.70710677, 0, -0.70710677, 0.70710677, 0, 16.02813, 0)
 
 [node name="Player" parent="." unique_id=1208118000 instance=ExtResource("1_11kma")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1.25, 0)
+
+[node name="Player2" parent="." unique_id=2036569454 instance=ExtResource("1_11kma")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1.25, 0)
+input_prefix = "p2_"
 
 [node name="Floor" type="StaticBody3D" parent="." unique_id=2017792861]
 

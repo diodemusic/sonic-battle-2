@@ -12,16 +12,32 @@ var attack_timer := 0.0
 var combo_count := 0
 var attack_buffered := false
 
+var keys := {}
+
 enum State {IDLE, MOVE, JUMP, FALL, LAND, ATTACK, HEAVY, UPPER}
 
 @onready var camera := get_viewport().get_camera_3d()
+@export var input_prefix := "p1_"
+
+
+func _ready() -> void:
+	keys = {
+	"move_left": input_prefix + "move_left",
+	"move_right": input_prefix + "move_right",
+	"move_up": input_prefix + "move_up",
+	"move_down": input_prefix + "move_down",
+	"jump": input_prefix + "jump",
+	"attack_jab": input_prefix + "attack_jab",
+	"attack_heavy": input_prefix + "attack_heavy",
+	"attack_upper": input_prefix + "attack_upper"
+}
 
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 
-	var input_dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	var input_dir := Input.get_vector(keys["move_left"], keys["move_right"], keys["move_up"], keys["move_down"])
 	var direction := (Vector3(input_dir.x, 0, input_dir.y)).rotated(Vector3.UP, camera.rotation.y).normalized()
 
 	match state:
@@ -32,23 +48,23 @@ func _physics_process(delta: float) -> void:
 			if not direction:
 				state = State.IDLE
 			
-			if Input.is_action_just_pressed("jump") and is_on_floor():
+			if Input.is_action_just_pressed(keys["jump"]) and is_on_floor():
 				velocity.y = JUMP_VELOCITY
 				state = State.JUMP
 
 			if not is_on_floor():
 				state = State.FALL
 			
-			if Input.is_action_just_pressed("attack_jab") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
 				attack_timer = JAB_DURATION
 				combo_count = 1
 				state = State.ATTACK
 
-			if Input.is_action_just_pressed("attack_heavy") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_heavy"]) and is_on_floor():
 				attack_timer = HEAVY_DURATION
 				state = State.HEAVY
 			
-			if Input.is_action_just_pressed("attack_upper") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_upper"]) and is_on_floor():
 				attack_timer = UPPER_DURATION
 				state = State.UPPER
 		State.IDLE:
@@ -58,23 +74,23 @@ func _physics_process(delta: float) -> void:
 			if direction:
 				state = State.MOVE
 			
-			if Input.is_action_just_pressed("jump") and is_on_floor():
+			if Input.is_action_just_pressed(keys["jump"]) and is_on_floor():
 				velocity.y = JUMP_VELOCITY
 				state = State.JUMP
 			
 			if not is_on_floor():
 				state = State.FALL
 			
-			if Input.is_action_just_pressed("attack_jab") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
 				attack_timer = JAB_DURATION
 				combo_count = 1
 				state = State.ATTACK
 
-			if Input.is_action_just_pressed("attack_heavy") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_heavy"]) and is_on_floor():
 				attack_timer = HEAVY_DURATION
 				state = State.HEAVY
 			
-			if Input.is_action_just_pressed("attack_upper") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_upper"]) and is_on_floor():
 				attack_timer = UPPER_DURATION
 				state = State.UPPER
 		State.JUMP:
@@ -99,7 +115,7 @@ func _physics_process(delta: float) -> void:
 
 			attack_timer -= delta
 
-			if Input.is_action_just_pressed("attack_jab") and is_on_floor():
+			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
 				attack_buffered = true
 
 			if attack_timer <= 0:
