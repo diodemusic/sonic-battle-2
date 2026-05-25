@@ -3,6 +3,9 @@
 /android/
 /export/
 
-# claude stuff
+# Claude stuff
 CLAUDE.md
 NOTES.md
+
+# Vscode settings
+.vscode
