@@ -49,6 +49,7 @@ var lives := STARTING_LIVES
 var ko_timer := 0.0
 
 signal hp_changed(new_hp: int)
+signal defeated()
 
 enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT, KO}
 
@@ -118,6 +119,12 @@ func take_damage(amount: int, knockback: Vector3) -> void:
 	if hp == 0:
 		state = State.KO
 		lives -= 1
+
+		if lives == 0:
+			defeated.emit()
+
+			return
+
 		ko_timer = KO_DURATION
 
 		return
