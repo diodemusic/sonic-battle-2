@@ -137,24 +137,24 @@ func take_damage(amount: int, knockback: Vector3) -> void:
 	print(self.name, " hp: ", hp)
 
 
-func _away_from(opponent: CharacterBody3D, force: float) -> Vector3:
-	var dir := opponent.global_position - global_position
+func _away_from(target: CharacterBody3D, force: float) -> Vector3:
+	var dir := target.global_position - global_position
 	dir.y = 0
 	
 	return dir.normalized() * force
 
 
-func _direction_to(opponent: CharacterBody3D) -> Vector3:
-	var dir := opponent.global_position - global_position
+func _direction_to(target: CharacterBody3D) -> Vector3:
+	var dir := target.global_position - global_position
 	dir.y = 0
 	
 	return dir.normalized()
 
 
 func _on_hitbox_area_entered(area: Area3D) -> void:
-	var opponent := area.get_parent() as CharacterBody3D
+	var victim := area.get_parent() as CharacterBody3D
 
-	if opponent == self:
+	if victim == self:
 		return # stop hitting yourself lol
 	
 	var stats: Dictionary = MOVES[state]
@@ -163,15 +163,15 @@ func _on_hitbox_area_entered(area: Area3D) -> void:
 
 	if state == State.JAB and combo_count == 3:
 		damage = stats["finisher_damage"]
-		knockback = _away_from(opponent, stats["knockback_force"])
+		knockback = _away_from(victim, stats["knockback_force"])
 	elif state == State.HEAVY:
 		damage = stats["damage"]
-		knockback = _away_from(opponent, stats["knockback_force"])
+		knockback = _away_from(victim, stats["knockback_force"])
 	elif state == State.UPPER:
 		damage = stats["damage"]
 		knockback = Vector3.UP * stats["launch_force"]
 
-	opponent.take_damage(damage, knockback)
+	victim.take_damage(damage, knockback)
 
 
 func _ready() -> void:
