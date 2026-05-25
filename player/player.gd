@@ -1,10 +1,10 @@
 extends CharacterBody3D
 
 
-const SPEED = 5.0
-const JUMP_VELOCITY = 4.5
-const HURT_DURATION = 0.25
-const MOVES = {
+const SPEED := 5.0
+const JUMP_VELOCITY := 4.5
+const HURT_DURATION := 0.25
+const MOVES := {
 	State.JAB: {
 		"duration" = 0.25,
 		"startup" = 0.05,
@@ -30,8 +30,10 @@ const MOVES = {
 	}
 }
 const MAX_HP := 100
-const HEAL_RATE = 15.0
-const SHOT_SCENE = preload("res://shot/shot.tscn")
+const HEAL_RATE := 15.0
+const SHOT_SCENE := preload("res://shot/shot.tscn")
+const STARTING_LIVES := 3
+const KO_DURATION := 1.5
 
 var state := State.IDLE
 var attack_timer := 0.0
@@ -43,9 +45,12 @@ var launched := false
 var heal_buffer := 0.0
 var opponent: CharacterBody3D
 var air_shot_used := false
+var lives := STARTING_LIVES
+var ko_timer := 0.0
+
 signal hp_changed(new_hp: int)
 
-enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT}
+enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT, KO}
 
 @onready var camera := get_viewport().get_camera_3d()
 @export var input_prefix := "p1_"
@@ -102,10 +107,21 @@ func _tick_attack(stats: Dictionary, delta: float) -> bool:
 
 func take_damage(amount: int, knockback: Vector3) -> void:
 	if state == State.GUARD:
-		return # no
+		return
+	
+	if state == State.KO:
+		return
 
 	hp = max(hp - amount, 0)
 	hp_changed.emit(hp)
+
+	if hp == 0:
+		state = State.KO
+		lives -= 1
+		ko_timer = KO_DURATION
+
+		return
+
 	velocity = knockback
 	launched = knockback.y > 0
 	attack_timer = HURT_DURATION
@@ -296,5 +312,15 @@ func _physics_process(delta: float) -> void:
 
 			if attack_timer <= 0:
 				state = State.IDLE
+		State.KO:
+			velocity.x = 0
+			velocity.z = 0
 
+			ko_timer -= delta
+
+			if lives > 0 and ko_timer <= 0:
+				hp = MAX_HP
+				hp_changed.emit(hp)
+				state = State.IDLE
+			
 	move_and_slide()
