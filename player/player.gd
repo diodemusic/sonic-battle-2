@@ -30,7 +30,7 @@ const MOVES = {
 	}
 }
 const MAX_HP := 100
-const HEAL_RATE = 30.0
+const HEAL_RATE = 15.0
 const SHOT_SCENE = preload("res://shot/shot.tscn")
 
 var state := State.IDLE
