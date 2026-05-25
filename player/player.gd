@@ -43,6 +43,7 @@ var launched := false
 var heal_buffer := 0.0
 var opponent: CharacterBody3D
 var air_shot_used := false
+signal hp_changed(new_hp: int)
 
 enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT}
 
@@ -103,12 +104,13 @@ func take_damage(amount: int, knockback: Vector3) -> void:
 	if state == State.GUARD:
 		return # no
 
-	hp -= amount
+	hp = max(hp - amount, 0)
+	hp_changed.emit(hp)
 	velocity = knockback
 	launched = knockback.y > 0
 	attack_timer = HURT_DURATION
 	state = State.HURT
-
+	
 	print(self.name, " hp: ", hp)
 
 
@@ -280,6 +282,7 @@ func _physics_process(delta: float) -> void:
 
 			if whole > 0:
 				hp = min(hp + whole, MAX_HP)
+				hp_changed.emit(hp)
 				heal_buffer -= whole
 
 			if not Input.is_action_pressed(keys["heal"]):

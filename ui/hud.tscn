@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://despngvdr6aly"]
+
+[node name="HUD" type="CanvasLayer" unique_id=1437711225]
+
+[node name="P1HealthBar" type="ProgressBar" parent="." unique_id=1155997823]
+custom_minimum_size = Vector2(200, 24)
+offset_right = 4.0
+offset_bottom = 27.0
+value = 100.0
