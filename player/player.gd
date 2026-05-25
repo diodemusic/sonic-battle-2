@@ -27,7 +27,6 @@ const MOVES = {
 	State.SHOT: {
 		"duration" = 0.5,
 		"startup" = 0.08,
-		"damage" = 10,
 	}
 }
 const MAX_HP := 100
@@ -43,6 +42,7 @@ var keys := {}
 var launched := false
 var heal_buffer := 0.0
 var opponent: CharacterBody3D
+var air_shot_used := false
 
 enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT}
 
@@ -50,7 +50,15 @@ enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, 
 @export var input_prefix := "p1_"
 
 
-func _check_action_triggers() -> bool:
+func _fire_shot() -> void:
+	var shot := SHOT_SCENE.instantiate()
+	shot.player_owner = self
+	shot.direction = _direction_to(opponent)
+	shot.global_position = global_position
+	get_parent().add_child(shot)
+
+
+func _check_action_triggers() -> void:
 	if Input.is_action_just_pressed(keys["jump"]):
 		velocity.y = JUMP_VELOCITY
 		state = State.JUMP
@@ -70,16 +78,14 @@ func _check_action_triggers() -> bool:
 		state = State.HEAL
 	elif Input.is_action_just_pressed(keys["attack_shot"]):
 		attack_timer = MOVES[State.SHOT]["duration"]
-		var shot := SHOT_SCENE.instantiate()
-		shot.player_owner = self
-		shot.direction = _direction_to(opponent)
-		shot.global_position = global_position
-		get_parent().add_child(shot)
+		_fire_shot()
 		state = State.SHOT
-	else:
-		return false
 
-	return true
+
+func _check_air_action_triggers() -> void:
+	if Input.is_action_just_pressed(keys["attack_shot"]) and not air_shot_used:
+		_fire_shot()
+		air_shot_used = true
 
 
 func _tick_attack(stats: Dictionary, delta: float) -> bool:
@@ -202,11 +208,15 @@ func _physics_process(delta: float) -> void:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
 
+			_check_air_action_triggers()
+
 			if velocity.y <= 0:
 				state = State.FALL
 		State.FALL:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
+
+			_check_air_action_triggers()
 
 			if is_on_floor():
 				state = State.LAND
@@ -215,6 +225,8 @@ func _physics_process(delta: float) -> void:
 				state = State.MOVE
 			else:
 				state = State.IDLE
+
+			air_shot_used = false
 		State.JAB:
 			var expired := _tick_attack(MOVES[State.JAB], delta)
 
