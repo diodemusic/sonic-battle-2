@@ -6,6 +6,7 @@ A fan-made sequel to **Sonic Battle** (GBA, 2003): an isometric arena fighter.
 
 ## Status
 
+```txt
 [x] - character movement (run, jump, fall, land)
 [x] - state machine
 [x] - attacks (jab combo, heavy, upper)
@@ -15,6 +16,7 @@ A fan-made sequel to **Sonic Battle** (GBA, 2003): an isometric arena fighter.
 [ ] - health, lives, KO, win condition                       <-- WE ARE HERE
 [ ] - presentation (real sprites, dressed stage, combat UI)
 [ ] - menus (title → character select → match → results)
+```
 
 the vision beyond demo v0.1 is more characters, the move mixing/kit building system, maybe online play in the future
 
