@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://dpkh2xoclprok"]
+
+[ext_resource type="Script" uid="uid://c8c5oh13kygri" path="res://shot/shot.gd" id="1_txuba"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_o5adf"]
+radius = 0.333
+height = 0.667
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_o5adf"]
+radius = 0.333
+
+[node name="Shot" type="Area3D" unique_id=79607524]
+collision_layer = 0
+collision_mask = 4
+script = ExtResource("1_txuba")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=332964057]
+mesh = SubResource("SphereMesh_o5adf")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1769936835]
+shape = SubResource("SphereShape3D_o5adf")

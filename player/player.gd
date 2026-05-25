@@ -24,9 +24,15 @@ const MOVES = {
 		"damage" = 10,
 		"launch_force" = 7.0,
 	},
+	State.SHOT: {
+		"duration" = 0.5,
+		"startup" = 0.08,
+		"damage" = 10,
+	}
 }
 const MAX_HP := 100
 const HEAL_RATE = 30.0
+const SHOT_SCENE = preload("res://shot/shot.tscn")
 
 var state := State.IDLE
 var attack_timer := 0.0
@@ -35,12 +41,45 @@ var attack_buffered := false
 var hp := MAX_HP
 var keys := {}
 var launched := false
-var heal_buffer = 0.0
+var heal_buffer := 0.0
+var opponent: CharacterBody3D
 
-enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL}
+enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT}
 
 @onready var camera := get_viewport().get_camera_3d()
 @export var input_prefix := "p1_"
+
+
+func _check_action_triggers() -> bool:
+	if Input.is_action_just_pressed(keys["jump"]):
+		velocity.y = JUMP_VELOCITY
+		state = State.JUMP
+	elif Input.is_action_just_pressed(keys["attack_jab"]):
+		attack_timer = MOVES[State.JAB]["duration"]
+		combo_count = 1
+		state = State.JAB
+	elif Input.is_action_just_pressed(keys["attack_heavy"]):
+		attack_timer = MOVES[State.HEAVY]["duration"]
+		state = State.HEAVY
+	elif Input.is_action_just_pressed(keys["attack_upper"]):
+		attack_timer = MOVES[State.UPPER]["duration"]
+		state = State.UPPER
+	elif Input.is_action_pressed(keys["guard"]):
+		state = State.GUARD
+	elif Input.is_action_pressed(keys["heal"]):
+		state = State.HEAL
+	elif Input.is_action_just_pressed(keys["attack_shot"]):
+		attack_timer = MOVES[State.SHOT]["duration"]
+		var shot := SHOT_SCENE.instantiate()
+		shot.player_owner = self
+		shot.direction = _direction_to(opponent)
+		shot.global_position = global_position
+		get_parent().add_child(shot)
+		state = State.SHOT
+	else:
+		return false
+
+	return true
 
 
 func _tick_attack(stats: Dictionary, delta: float) -> bool:
@@ -72,6 +111,13 @@ func _away_from(opponent: CharacterBody3D, force: float) -> Vector3:
 	dir.y = 0
 	
 	return dir.normalized() * force
+
+
+func _direction_to(opponent: CharacterBody3D) -> Vector3:
+	var dir := opponent.global_position - global_position
+	dir.y = 0
+	
+	return dir.normalized()
 
 
 func _on_hitbox_area_entered(area: Area3D) -> void:
@@ -108,10 +154,16 @@ func _ready() -> void:
 		"attack_heavy": input_prefix + "attack_heavy",
 		"attack_upper": input_prefix + "attack_upper",
 		"guard": input_prefix + "guard",
-		"heal": input_prefix + "heal"
+		"heal": input_prefix + "heal",
+		"attack_shot": input_prefix + "attack_shot",
 	}
 
 	$Hitbox.area_entered.connect(_on_hitbox_area_entered)
+	
+	for node in get_parent().get_children():
+		if node is CharacterBody3D and node != self:
+			opponent = node
+			break
 
 
 func _physics_process(delta: float) -> void:
@@ -132,24 +184,8 @@ func _physics_process(delta: float) -> void:
 			if not is_on_floor():
 				state = State.FALL
 				return
-			
-			if Input.is_action_just_pressed(keys["jump"]):
-				velocity.y = JUMP_VELOCITY
-				state = State.JUMP
-			elif Input.is_action_just_pressed(keys["attack_jab"]):
-				attack_timer = MOVES[State.JAB]["duration"]
-				combo_count = 1
-				state = State.JAB
-			elif Input.is_action_just_pressed(keys["attack_heavy"]):
-				attack_timer = MOVES[State.HEAVY]["duration"]
-				state = State.HEAVY
-			elif Input.is_action_just_pressed(keys["attack_upper"]):
-				attack_timer = MOVES[State.UPPER]["duration"]
-				state = State.UPPER
-			elif Input.is_action_pressed(keys["guard"]):
-				state = State.GUARD
-			elif Input.is_action_pressed(keys["heal"]):
-				state = State.HEAL
+
+			_check_action_triggers()
 		State.IDLE:
 			velocity.x = 0
 			velocity.z = 0
@@ -161,23 +197,7 @@ func _physics_process(delta: float) -> void:
 				state = State.FALL
 				return
 			
-			if Input.is_action_just_pressed(keys["jump"]):
-				velocity.y = JUMP_VELOCITY
-				state = State.JUMP
-			elif Input.is_action_just_pressed(keys["attack_jab"]):
-				attack_timer = MOVES[State.JAB]["duration"]
-				combo_count = 1
-				state = State.JAB
-			elif Input.is_action_just_pressed(keys["attack_heavy"]):
-				attack_timer = MOVES[State.HEAVY]["duration"]
-				state = State.HEAVY
-			elif Input.is_action_just_pressed(keys["attack_upper"]):
-				attack_timer = MOVES[State.UPPER]["duration"]
-				state = State.UPPER
-			elif Input.is_action_pressed(keys["guard"]):
-				state = State.GUARD
-			elif Input.is_action_pressed(keys["heal"]):
-				state = State.HEAL
+			_check_action_triggers()
 		State.JUMP:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
@@ -188,7 +208,8 @@ func _physics_process(delta: float) -> void:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
 
-			if is_on_floor(): state = State.LAND
+			if is_on_floor():
+				state = State.LAND
 		State.LAND:
 			if direction:
 				state = State.MOVE
@@ -251,6 +272,14 @@ func _physics_process(delta: float) -> void:
 
 			if not Input.is_action_pressed(keys["heal"]):
 				heal_buffer = 0.0
+				state = State.IDLE
+		State.SHOT:
+			velocity.x = 0
+			velocity.z = 0
+
+			attack_timer -= delta
+
+			if attack_timer <= 0:
 				state = State.IDLE
 
 	move_and_slide()
