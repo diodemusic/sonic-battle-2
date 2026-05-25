@@ -1,9 +1,24 @@
 [gd_scene format=3 uid="uid://despngvdr6aly"]
 
+[ext_resource type="Script" uid="uid://cqkj0qfs27o5u" path="res://ui/hud.gd" id="1_rbyyf"]
+
 [node name="HUD" type="CanvasLayer" unique_id=1437711225]
+script = ExtResource("1_rbyyf")
 
 [node name="P1HealthBar" type="ProgressBar" parent="." unique_id=1155997823]
-custom_minimum_size = Vector2(200, 24)
-offset_right = 4.0
-offset_bottom = 27.0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 216.0
+offset_bottom = 43.0
+value = 100.0
+
+[node name="P2HealthBar" type="ProgressBar" parent="." unique_id=232846884]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 43.0
+grow_horizontal = 0
 value = 100.0
