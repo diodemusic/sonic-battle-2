@@ -1,26 +1,27 @@
+class_name Player
 extends CharacterBody3D
 
-
 const SPEED := 5.0
-const JUMP_VELOCITY := 4.5
+const JUMP_VELOCITY := 5.5
 const HURT_DURATION := 0.25
 const MOVES := {
 	State.JAB: {
-		"duration" = 0.25,
-		"startup" = 0.05,
+		"duration" = 0.4,
+		"startup" = 0.13,
 		"damage" = 5,
+		"finisher_duration" = 0.53,
 		"finisher_damage" = 15,
 		"knockback_force" = 10.0,
 	},
 	State.HEAVY: {
-		"duration" = 0.55,
-		"startup" = 0.1,
-		"damage" = 15,
-		"knockback_force" = 12.0,
+		"duration" = 1.07,
+		"startup" = 0.33,
+		"damage" = 25,
+		"knockback_force" = 15.0,
 	},
 	State.UPPER: {
-		"duration" = 0.5,
-		"startup" = 0.08,
+		"duration" = 0.6,
+		"startup" = 0.2,
 		"damage" = 10,
 		"launch_force" = 7.0,
 	},
@@ -95,12 +96,12 @@ func _check_air_action_triggers() -> void:
 		air_shot_used = true
 
 
-func _tick_attack(stats: Dictionary, delta: float) -> bool:
+func _tick_attack(delta: float, startup: float, duration: float) -> bool:
 	velocity.x = 0
 	velocity.z = 0
 	attack_timer -= delta
 
-	if attack_timer < stats["duration"] - stats["startup"] and not $Hitbox.monitoring:
+	if attack_timer < duration - startup and not $Hitbox.monitoring:
 		$Hitbox.monitoring = true
 
 	return attack_timer <= 0
@@ -133,8 +134,6 @@ func take_damage(amount: int, knockback: Vector3) -> void:
 	launched = knockback.y > 0
 	attack_timer = HURT_DURATION
 	state = State.HURT
-	
-	print(self.name, " hp: ", hp)
 
 
 func _away_from(target: CharacterBody3D, force: float) -> Vector3:
@@ -253,7 +252,8 @@ func _physics_process(delta: float) -> void:
 
 			air_shot_used = false
 		State.JAB:
-			var expired := _tick_attack(MOVES[State.JAB], delta)
+			var jab_duration: float = MOVES[State.JAB]["finisher_duration"] if combo_count == 3 else MOVES[State.JAB]["duration"]
+			var expired := _tick_attack(delta, MOVES[State.JAB]["startup"], jab_duration)
 
 			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
 				attack_buffered = true
@@ -263,23 +263,28 @@ func _physics_process(delta: float) -> void:
 
 				if attack_buffered and combo_count < 3:
 					combo_count += 1
-					attack_timer = MOVES[State.JAB]["duration"]
+
+					if combo_count == 3:
+						attack_timer = MOVES[State.JAB]["finisher_duration"]
+					else:
+						attack_timer = MOVES[State.JAB]["duration"]
+
 					attack_buffered = false
 				else:
 					combo_count = 0
 					attack_buffered = false
 					state = State.IDLE
 		State.HEAVY:
-			if _tick_attack(MOVES[State.HEAVY], delta):
+			if _tick_attack(delta, MOVES[State.HEAVY]["startup"], MOVES[State.HEAVY]["duration"]):
 				$Hitbox.monitoring = false
 				state = State.IDLE
 		State.UPPER:
-			if _tick_attack(MOVES[State.UPPER], delta):
+			if _tick_attack(delta, MOVES[State.UPPER]["startup"], MOVES[State.UPPER]["duration"]):
 				$Hitbox.monitoring = false
 				state = State.IDLE
 		State.HURT:
 			if launched:
-				if is_on_floor():
+				if is_on_floor() and velocity.y <= 0:
 					velocity.x = 0
 					velocity.z = 0
 					launched = false
