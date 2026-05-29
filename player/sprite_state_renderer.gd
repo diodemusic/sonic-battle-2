@@ -1,8 +1,15 @@
 extends AnimatedSprite3D
 
 
+func _on_hit_landed() -> void:
+	var player: Player = get_parent()
+	stop()
+	play("hurt_air" if player.launched else "hurt")
+
+
 func _process(_delta: float) -> void:
 	var player: Player = get_parent()
+	player.hit_landed.connect(_on_hit_landed)
 
 	match player.state:
 		Player.State.MOVE:
@@ -23,17 +30,20 @@ func _process(_delta: float) -> void:
 		Player.State.LAND:
 			if animation != "idle":
 				play("idle")
-		Player.State.JAB:
-			var jab_animation := "jab" + str(player.combo_count)
-
-			if animation != jab_animation:
-				play(jab_animation)
 		Player.State.HEAVY:
 			if animation != "heavy":
 				play("heavy")
-		Player.State.UPPER:
-			if animation != "upper":
-				play("upper")
+		Player.State.LAUNCHER:
+			if animation != "launcher":
+				play("launcher")
+		Player.State.LINKER:
+			if animation != "jump":
+				play("jump")
+		Player.State.FINISHER:
+			var finisher_animation := "finisher" + str(player.combo_count)
+
+			if animation != finisher_animation:
+				play(finisher_animation)
 		Player.State.HURT:
 			var hurt_animation := "hurt_air" if player.launched else "hurt"
 

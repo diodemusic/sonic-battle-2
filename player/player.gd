@@ -1,45 +1,63 @@
 class_name Player
 extends CharacterBody3D
 
-const SPEED := 5.0
+const SPEED := 7.0
 const JUMP_VELOCITY := 5.5
+const JUMP_GRAVITY := 15.0
+const FALL_GRAVITY := 23.0
 const HURT_DURATION := 0.25
-const MOVES := {
-	State.JAB: {
-		"duration" = 0.4,
-		"startup" = 0.13,
-		"damage" = 5,
-		"finisher_duration" = 0.53,
-		"finisher_damage" = 15,
-		"knockback_force" = 10.0,
-	},
-	State.HEAVY: {
-		"duration" = 1.07,
-		"startup" = 0.33,
-		"damage" = 25,
-		"knockback_force" = 15.0,
-	},
-	State.UPPER: {
-		"duration" = 0.6,
-		"startup" = 0.2,
-		"damage" = 10,
-		"launch_force" = 7.0,
-	},
-	State.SHOT: {
-		"duration" = 0.5,
-		"startup" = 0.08,
-	}
-}
 const MAX_HP := 100
 const HEAL_RATE := 15.0
 const SHOT_SCENE := preload("res://shot/shot.tscn")
 const STARTING_LIVES := 3
 const KO_DURATION := 1.5
+const GUARD_DURATION := 1.5
+const GUARD_COOLDOWN := 2.0
+const MOVES := {
+	State.FINISHER: {
+		"duration" = 0.4,
+		"startup" = 0.13,
+		"damage" = 5,
+		"final_hit_duration" = 0.53,
+		"final_hit_damage" = 35,
+		"knockback_force" = 20.0,
+		"max_meter" = 3,
+		"hitstop_duration" = 0.10,
+		"freeze_duration" = 0.5,
+	},
+	State.HEAVY: {
+		"duration" = 1.07,
+		"startup" = 0.33,
+		"damage" = 8,
+		"knockback_force" = 15.0,
+	},
+	State.LAUNCHER: {
+		"duration" = 0.6,
+		"startup" = 0.2,
+		"damage" = 10,
+		"launch_force" = 9.0,
+	},
+	State.SHOT: {
+		"duration" = 0.5,
+		"startup" = 0.08,
+	},
+	State.LINKER: {
+		"duration" = 0.45,
+		"startup" = 0.15,
+		"damage" = 7,
+		"launch_force" = 8.0,
+		"speed" = 13.0,
+		"decay" = 0.7,
+		"recovery_duration" = 0.25,
+		"bounce_force_xz" = 12.0,
+		"bounce_force_y" = -4.0,
+		"hitstop_duration" = 0.16,
+	},
+}
 
 var state := State.IDLE
 var attack_timer := 0.0
 var combo_count := 0
-var attack_buffered := false
 var hp := MAX_HP
 var keys := {}
 var launched := false
@@ -48,15 +66,22 @@ var opponent: CharacterBody3D
 var air_shot_used := false
 var lives := STARTING_LIVES
 var ko_timer := 0.0
+var guard_timer := 0.0
+var guard_cooldown_timer := 0.0
+var link_count := 0
+var hitstop_timer := 0.0
+var finisher_meter := 0
+var metered_finisher := false
 
 signal hp_changed(new_hp: int)
 signal defeated()
+signal finisher_meter_changed(new_finsher_meter: int)
+signal hit_landed()
 
-enum State {IDLE, MOVE, JUMP, FALL, LAND, JAB, HEAVY, UPPER, HURT, GUARD, HEAL, SHOT, KO}
+enum State {IDLE, MOVE, JUMP, FALL, LAND, HEAVY, LAUNCHER, LINKER, FINISHER, HURT, GUARD, HEAL, SHOT, KO}
 
 @onready var camera := get_viewport().get_camera_3d()
 @export var input_prefix := "p1_"
-
 
 func _fire_shot() -> void:
 	var shot := SHOT_SCENE.instantiate()
@@ -70,17 +95,22 @@ func _check_action_triggers() -> void:
 	if Input.is_action_just_pressed(keys["jump"]):
 		velocity.y = JUMP_VELOCITY
 		state = State.JUMP
-	elif Input.is_action_just_pressed(keys["attack_jab"]):
-		attack_timer = MOVES[State.JAB]["duration"]
-		combo_count = 1
-		state = State.JAB
 	elif Input.is_action_just_pressed(keys["attack_heavy"]):
 		attack_timer = MOVES[State.HEAVY]["duration"]
 		state = State.HEAVY
-	elif Input.is_action_just_pressed(keys["attack_upper"]):
-		attack_timer = MOVES[State.UPPER]["duration"]
-		state = State.UPPER
-	elif Input.is_action_pressed(keys["guard"]):
+	elif Input.is_action_just_pressed(keys["attack_launcher"]):
+		attack_timer = MOVES[State.LAUNCHER]["duration"]
+		state = State.LAUNCHER
+	elif Input.is_action_just_pressed(keys["attack_linker"]) and opponent.state == State.HURT and opponent.launched:
+		attack_timer = MOVES[State.LINKER]["duration"]
+		state = State.LINKER
+	elif Input.is_action_just_pressed(keys["attack_finisher"]):
+		attack_timer = MOVES[State.FINISHER]["duration"]
+		combo_count = 1
+		metered_finisher = (finisher_meter == MOVES[State.FINISHER]["max_meter"])
+		state = State.FINISHER
+	elif Input.is_action_just_pressed(keys["guard"]) and guard_cooldown_timer <= 0:
+		guard_timer = GUARD_DURATION
 		state = State.GUARD
 	elif Input.is_action_pressed(keys["heal"]):
 		state = State.HEAL
@@ -107,12 +137,17 @@ func _tick_attack(delta: float, startup: float, duration: float) -> bool:
 	return attack_timer <= 0
 
 
-func take_damage(amount: int, knockback: Vector3) -> void:
+func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false) -> void:
 	if state == State.GUARD:
-		return
-	
+		if not bypass_guard:
+			return
+
+		guard_cooldown_timer = GUARD_COOLDOWN
+
 	if state == State.KO:
 		return
+
+	hit_landed.emit()
 
 	hp = max(hp - amount, 0)
 	hp_changed.emit(hp)
@@ -160,17 +195,44 @@ func _on_hitbox_area_entered(area: Area3D) -> void:
 	var damage: int = stats["damage"]
 	var knockback := Vector3.ZERO
 
-	if state == State.JAB and combo_count == 3:
-		damage = stats["finisher_damage"]
-		knockback = _away_from(victim, stats["knockback_force"])
-	elif state == State.HEAVY:
+	if state == State.HEAVY:
 		damage = stats["damage"]
 		knockback = _away_from(victim, stats["knockback_force"])
-	elif state == State.UPPER:
+	elif state == State.LAUNCHER:
 		damage = stats["damage"]
 		knockback = Vector3.UP * stats["launch_force"]
+		link_count = 0
+	elif state == State.LINKER:
+		damage = stats["damage"]
+		knockback = Vector3.UP * stats["launch_force"] * pow(stats["decay"], link_count)
+		var dir := (global_position - victim.global_position)
+		dir.y = 0
+		velocity = dir.normalized() * stats["bounce_force_xz"]
+		velocity.y = stats["bounce_force_y"]
+		attack_timer = MOVES[State.LINKER]["recovery_duration"]
+		$Hitbox.monitoring = false
+		link_count += 1
+		hitstop_timer = MOVES[State.LINKER]["hitstop_duration"]
+		victim.hitstop_timer = MOVES[State.LINKER]["hitstop_duration"]
+		finisher_meter = min(finisher_meter + 1, MOVES[State.FINISHER]["max_meter"])
+		finisher_meter_changed.emit(finisher_meter)
+	elif state == State.FINISHER and combo_count == 1 and metered_finisher:
+		damage = stats["damage"]
+		finisher_meter = 0
+		finisher_meter_changed.emit(finisher_meter)
+	elif state == State.FINISHER and combo_count == 3:
+		damage = stats["final_hit_damage"]
+		knockback = _away_from(victim, stats["knockback_force"])
 
-	victim.take_damage(damage, knockback)
+	if state == State.FINISHER and metered_finisher:
+		hitstop_timer = MOVES[State.FINISHER]["hitstop_duration"]
+
+		if combo_count < 3:
+			victim.hitstop_timer = MOVES[State.FINISHER]["freeze_duration"]
+		else:
+			victim.hitstop_timer = MOVES[State.FINISHER]["hitstop_duration"]
+
+	victim.take_damage(damage, knockback, state == State.HEAVY)
 
 
 func _ready() -> void:
@@ -180,9 +242,10 @@ func _ready() -> void:
 		"move_up": input_prefix + "move_up",
 		"move_down": input_prefix + "move_down",
 		"jump": input_prefix + "jump",
-		"attack_jab": input_prefix + "attack_jab",
 		"attack_heavy": input_prefix + "attack_heavy",
-		"attack_upper": input_prefix + "attack_upper",
+		"attack_launcher": input_prefix + "attack_launcher",
+		"attack_linker": input_prefix + "attack_linker",
+		"attack_finisher": input_prefix + "attack_finisher",
 		"guard": input_prefix + "guard",
 		"heal": input_prefix + "heal",
 		"attack_shot": input_prefix + "attack_shot",
@@ -197,11 +260,17 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if hitstop_timer > 0:
+		hitstop_timer -= delta
+		return
+
 	if not is_on_floor():
-		velocity += get_gravity() * delta
+		var g = FALL_GRAVITY if velocity.y < 0 else JUMP_GRAVITY
+		velocity.y -= g * delta
 
 	var input_dir := Input.get_vector(keys["move_left"], keys["move_right"], keys["move_up"], keys["move_down"])
 	var direction := (Vector3(input_dir.x, 0, input_dir.y)).rotated(Vector3.UP, camera.rotation.y).normalized()
+	guard_cooldown_timer = max(guard_cooldown_timer - delta, 0)
 
 	match state:
 		State.MOVE:
@@ -231,7 +300,6 @@ func _physics_process(delta: float) -> void:
 		State.JUMP:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
-
 			_check_air_action_triggers()
 
 			if velocity.y <= 0:
@@ -239,7 +307,6 @@ func _physics_process(delta: float) -> void:
 		State.FALL:
 			velocity.x = direction.x * SPEED
 			velocity.z = direction.z * SPEED
-
 			_check_air_action_triggers()
 
 			if is_on_floor():
@@ -251,37 +318,45 @@ func _physics_process(delta: float) -> void:
 				state = State.IDLE
 
 			air_shot_used = false
-		State.JAB:
-			var jab_duration: float = MOVES[State.JAB]["finisher_duration"] if combo_count == 3 else MOVES[State.JAB]["duration"]
-			var expired := _tick_attack(delta, MOVES[State.JAB]["startup"], jab_duration)
-
-			if Input.is_action_just_pressed(keys["attack_jab"]) and is_on_floor():
-				attack_buffered = true
-
-			if expired:
-				$Hitbox.monitoring = false
-
-				if attack_buffered and combo_count < 3:
-					combo_count += 1
-
-					if combo_count == 3:
-						attack_timer = MOVES[State.JAB]["finisher_duration"]
-					else:
-						attack_timer = MOVES[State.JAB]["duration"]
-
-					attack_buffered = false
-				else:
-					combo_count = 0
-					attack_buffered = false
-					state = State.IDLE
 		State.HEAVY:
 			if _tick_attack(delta, MOVES[State.HEAVY]["startup"], MOVES[State.HEAVY]["duration"]):
 				$Hitbox.monitoring = false
 				state = State.IDLE
-		State.UPPER:
-			if _tick_attack(delta, MOVES[State.UPPER]["startup"], MOVES[State.UPPER]["duration"]):
+		State.LAUNCHER:
+			if _tick_attack(delta, MOVES[State.LAUNCHER]["startup"], MOVES[State.LAUNCHER]["duration"]):
 				$Hitbox.monitoring = false
 				state = State.IDLE
+		State.LINKER:
+			if attack_timer > MOVES[State.LINKER]["recovery_duration"]:
+				var dir := (opponent.global_position - global_position).normalized()
+				velocity = dir * MOVES[State.LINKER]["speed"]
+
+			attack_timer -= delta
+
+			if attack_timer < MOVES[State.LINKER]["duration"] - MOVES[State.LINKER]["startup"] and not $Hitbox.monitoring:
+				$Hitbox.monitoring = true
+			
+			if attack_timer <= 0:
+				$Hitbox.monitoring = false
+				state = State.FALL
+		State.FINISHER:
+			var final_hit_duration: float = MOVES[State.FINISHER]["final_hit_duration"] if combo_count == 3 else MOVES[State.FINISHER]["duration"]
+			var expired := _tick_attack(delta, MOVES[State.FINISHER]["startup"], final_hit_duration)
+
+			if expired:
+				$Hitbox.monitoring = false
+
+				if metered_finisher and combo_count < 3:
+					combo_count += 1
+
+					if combo_count == 3:
+						attack_timer = MOVES[State.FINISHER]["final_hit_duration"]
+					else:
+						attack_timer = MOVES[State.FINISHER]["duration"]
+				else:
+					combo_count = 0
+					metered_finisher = false
+					state = State.IDLE
 		State.HURT:
 			if launched:
 				if is_on_floor() and velocity.y <= 0:
@@ -299,8 +374,10 @@ func _physics_process(delta: float) -> void:
 		State.GUARD:
 			velocity.x = 0
 			velocity.z = 0
+			guard_timer -= delta
 
-			if not Input.is_action_pressed(keys["guard"]):
+			if guard_timer <= 0 or not Input.is_action_pressed(keys["guard"]):
+				guard_cooldown_timer = GUARD_COOLDOWN
 				state = State.IDLE
 		State.HEAL:
 			velocity.x = 0
@@ -319,7 +396,6 @@ func _physics_process(delta: float) -> void:
 		State.SHOT:
 			velocity.x = 0
 			velocity.z = 0
-
 			attack_timer -= delta
 
 			if attack_timer <= 0:
@@ -327,12 +403,13 @@ func _physics_process(delta: float) -> void:
 		State.KO:
 			velocity.x = 0
 			velocity.z = 0
-
 			ko_timer -= delta
 
 			if lives > 0 and ko_timer <= 0:
 				hp = MAX_HP
 				hp_changed.emit(hp)
+				finisher_meter = 0
+				finisher_meter_changed.emit(finisher_meter)
 				state = State.IDLE
 			
 	move_and_slide()

@@ -8,17 +8,37 @@ script = ExtResource("1_rbyyf")
 [node name="P1HealthBar" type="ProgressBar" parent="." unique_id=1155997823]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 216.0
-offset_bottom = 43.0
+offset_right = 491.0
+offset_bottom = 61.0
 value = 100.0
 
 [node name="P2HealthBar" type="ProgressBar" parent="." unique_id=232846884]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -200.0
+offset_left = -491.0
 offset_top = 16.0
 offset_right = -16.0
-offset_bottom = 43.0
+offset_bottom = 61.0
 grow_horizontal = 0
 value = 100.0
+
+[node name="P1FinisherMeter" type="ProgressBar" parent="." unique_id=414367294]
+offset_left = 16.0
+offset_top = 77.0
+offset_right = 135.99992
+offset_bottom = 104.0
+max_value = 3.0
+step = 1.0
+
+[node name="P2FinisherMeter" type="ProgressBar" parent="." unique_id=1332253957]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -136.0
+offset_top = 77.0
+offset_right = -16.000488
+offset_bottom = 104.0
+grow_horizontal = 0
+max_value = 3.0
+step = 1.0

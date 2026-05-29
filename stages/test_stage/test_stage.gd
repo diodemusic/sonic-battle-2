@@ -16,3 +16,5 @@ func _ready() -> void:
 	$Player2.hp_changed.connect($HUD._on_p2_hp_changed)
 	$Player.defeated.connect(_on_p1_defeated)
 	$Player2.defeated.connect(_on_p2_defeated)
+	$Player.finisher_meter_changed.connect($HUD._on_p1_finisher_meter_changed)
+	$Player2.finisher_meter_changed.connect($HUD._on_p2_finisher_meter_changed)
