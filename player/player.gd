@@ -77,11 +77,13 @@ var metered_finisher := false
 var parryable := false
 var parry_cooldown_timer := 0.0
 var link_winding_up := false
+var combo_hits := 0
 
 signal hp_changed(new_hp: int)
 signal defeated()
 signal finisher_meter_changed(new_finsher_meter: int)
 signal hit_landed()
+signal combo_changed(hits: int)
 
 enum State {IDLE, MOVE, JUMP, FALL, LAND, HEAVY, LAUNCHER, LINKER, FINISHER, HURT, GUARD, HEAL, SHOT, KO}
 
@@ -154,6 +156,11 @@ func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false) ->
 
 	hit_landed.emit()
 
+	if state != State.HURT:
+		combo_hits = 0
+
+	combo_hits += 1
+	combo_changed.emit(combo_hits)
 	hp = max(hp - amount, 0)
 	hp_changed.emit(hp)
 
