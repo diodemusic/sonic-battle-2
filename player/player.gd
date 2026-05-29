@@ -13,8 +13,28 @@ const STARTING_LIVES := 3
 const KO_DURATION := 1.5
 const GUARD_DURATION := 1.5
 const GUARD_COOLDOWN := 2.0
+const PARRY_COOLDOWN := 0.5
 const MOVES := {
-	State.FINISHER: {
+	State.LAUNCHER: {
+		"duration" = 0.6,
+		"startup" = 0.2,
+		"damage" = 10,
+		"launch_force" = 11.0,
+	},
+	State.LINKER: {
+		"duration" = 0.75,
+		"startup" = 0.2,
+		"damage" = 7,
+		"launch_force" = 8.0,
+		"speed" = 13.0,
+		"decay" = 0.7,
+		"recovery_duration" = 0.25,
+		"bounce_force_xz" = 12.0,
+		"bounce_force_y" = -4.0,
+		"hitstop_duration" = 0.16,
+		"parry_range" = 3.5,
+	},
+		State.FINISHER: {
 		"duration" = 0.4,
 		"startup" = 0.13,
 		"damage" = 5,
@@ -25,33 +45,15 @@ const MOVES := {
 		"hitstop_duration" = 0.10,
 		"freeze_duration" = 0.5,
 	},
+	State.SHOT: {
+		"duration" = 0.5,
+		"startup" = 0.08,
+	},
 	State.HEAVY: {
 		"duration" = 1.07,
 		"startup" = 0.33,
 		"damage" = 8,
 		"knockback_force" = 15.0,
-	},
-	State.LAUNCHER: {
-		"duration" = 0.6,
-		"startup" = 0.2,
-		"damage" = 10,
-		"launch_force" = 9.0,
-	},
-	State.SHOT: {
-		"duration" = 0.5,
-		"startup" = 0.08,
-	},
-	State.LINKER: {
-		"duration" = 0.45,
-		"startup" = 0.15,
-		"damage" = 7,
-		"launch_force" = 8.0,
-		"speed" = 13.0,
-		"decay" = 0.7,
-		"recovery_duration" = 0.25,
-		"bounce_force_xz" = 12.0,
-		"bounce_force_y" = -4.0,
-		"hitstop_duration" = 0.16,
 	},
 }
 
@@ -72,6 +74,9 @@ var link_count := 0
 var hitstop_timer := 0.0
 var finisher_meter := 0
 var metered_finisher := false
+var parryable := false
+var parry_cooldown_timer := 0.0
+var link_winding_up := false
 
 signal hp_changed(new_hp: int)
 signal defeated()
@@ -169,6 +174,13 @@ func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false) ->
 	launched = knockback.y > 0
 	attack_timer = HURT_DURATION
 	state = State.HURT
+
+
+func link_parried() -> void:
+	$Hitbox.monitoring = false
+	parryable = false
+	state = State.FALL
+	link_winding_up = false
 
 
 func _away_from(target: CharacterBody3D, force: float) -> Vector3:
@@ -271,6 +283,7 @@ func _physics_process(delta: float) -> void:
 	var input_dir := Input.get_vector(keys["move_left"], keys["move_right"], keys["move_up"], keys["move_down"])
 	var direction := (Vector3(input_dir.x, 0, input_dir.y)).rotated(Vector3.UP, camera.rotation.y).normalized()
 	guard_cooldown_timer = max(guard_cooldown_timer - delta, 0)
+	parry_cooldown_timer = max(parry_cooldown_timer - delta, 0)
 
 	match state:
 		State.MOVE:
@@ -327,15 +340,23 @@ func _physics_process(delta: float) -> void:
 				$Hitbox.monitoring = false
 				state = State.IDLE
 		State.LINKER:
-			if attack_timer > MOVES[State.LINKER]["recovery_duration"]:
+			if attack_timer > MOVES[State.LINKER]["duration"] - MOVES[State.LINKER]["startup"]:
+				velocity.x = 0
+				velocity.z = 0
+				parryable = false
+				link_winding_up = true
+			elif attack_timer > MOVES[State.LINKER]["recovery_duration"]:
 				var dir := (opponent.global_position - global_position).normalized()
 				velocity = dir * MOVES[State.LINKER]["speed"]
+				$Hitbox.monitoring = true
+				parryable = global_position.distance_to(opponent.global_position) < MOVES[State.LINKER]["parry_range"]
+				link_winding_up = false
+			else:
+				parryable = false
+				link_winding_up = false
 
 			attack_timer -= delta
 
-			if attack_timer < MOVES[State.LINKER]["duration"] - MOVES[State.LINKER]["startup"] and not $Hitbox.monitoring:
-				$Hitbox.monitoring = true
-			
 			if attack_timer <= 0:
 				$Hitbox.monitoring = false
 				state = State.FALL
@@ -359,6 +380,16 @@ func _physics_process(delta: float) -> void:
 					state = State.IDLE
 		State.HURT:
 			if launched:
+				if Input.is_action_just_pressed(keys["guard"]) and parry_cooldown_timer <= 0:
+					if opponent.parryable:
+						launched = false
+						velocity.x = 0
+						velocity.z = 0
+						state = State.FALL
+						opponent.link_parried()
+					else:
+						parry_cooldown_timer = PARRY_COOLDOWN
+
 				if is_on_floor() and velocity.y <= 0:
 					velocity.x = 0
 					velocity.z = 0

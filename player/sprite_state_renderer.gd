@@ -1,15 +1,15 @@
 extends AnimatedSprite3D
 
-
 func _on_hit_landed() -> void:
 	var player: Player = get_parent()
 	stop()
 	play("hurt_air" if player.launched else "hurt")
+	player.hit_landed.connect(_on_hit_landed)
 
 
 func _process(_delta: float) -> void:
 	var player: Player = get_parent()
-	player.hit_landed.connect(_on_hit_landed)
+	modulate = Color.YELLOW if player.link_winding_up else Color.WHITE
 
 	match player.state:
 		Player.State.MOVE:
