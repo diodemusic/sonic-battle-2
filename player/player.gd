@@ -41,7 +41,8 @@ const MOVES := {
 		"damage" = 5,
 		"final_hit_duration" = 0.53,
 		"final_hit_damage" = 35,
-		"knockback_force" = 0.0, # 20.0,
+		"knockback_force" = 17.0,
+		"launch_force" = 13.0,
 		"max_meter" = 3,
 		"hitstop_duration" = 0.10,
 		"freeze_duration" = 0.5,
@@ -251,6 +252,7 @@ func _on_hitbox_area_entered(area: Area3D) -> void:
 	elif state == State.FINISHER and combo_count == 3:
 		damage = stats["final_hit_damage"]
 		knockback = _away_from(victim, stats["knockback_force"])
+		knockback.y = stats["launch_force"]
 
 	if state == State.FINISHER and metered_finisher:
 		hitstop_timer = MOVES[State.FINISHER]["hitstop_duration"]
