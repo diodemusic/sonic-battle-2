@@ -64,6 +64,9 @@ func _process(_delta: float) -> void:
 		Player.State.KO:
 			if animation != "ko":
 				play("ko")
+		Player.State.KNOCKDOWN:
+			if animation != "ko":
+				play("ko")
 		_:
 			if animation != "idle":
 				play("idle")

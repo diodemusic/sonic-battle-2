@@ -14,6 +14,7 @@ const KO_DURATION := 1.5
 const GUARD_DURATION := 1.5
 const GUARD_COOLDOWN := 2.0
 const PARRY_COOLDOWN := 0.5
+const KNOCKDOWN_DURATION := 0.8
 const MOVES := {
 	State.LAUNCHER: {
 		"duration" = 0.6,
@@ -40,7 +41,7 @@ const MOVES := {
 		"damage" = 5,
 		"final_hit_duration" = 0.53,
 		"final_hit_damage" = 35,
-		"knockback_force" = 20.0,
+		"knockback_force" = 0.0, # 20.0,
 		"max_meter" = 3,
 		"hitstop_duration" = 0.10,
 		"freeze_duration" = 0.5,
@@ -78,6 +79,8 @@ var parryable := false
 var parry_cooldown_timer := 0.0
 var link_winding_up := false
 var combo_hits := 0
+var knockdown_timer := 0.0
+var knockdown_pending := false
 
 signal hp_changed(new_hp: int)
 signal defeated()
@@ -85,7 +88,7 @@ signal finisher_meter_changed(new_finsher_meter: int)
 signal hit_landed()
 signal combo_changed(hits: int)
 
-enum State {IDLE, MOVE, JUMP, FALL, LAND, HEAVY, LAUNCHER, LINKER, FINISHER, HURT, GUARD, HEAL, SHOT, KO}
+enum State {IDLE, MOVE, JUMP, FALL, LAND, HEAVY, LAUNCHER, LINKER, FINISHER, HURT, GUARD, HEAL, SHOT, KO, KNOCKDOWN}
 
 @onready var camera := get_viewport().get_camera_3d()
 @export var input_prefix := "p1_"
@@ -144,7 +147,7 @@ func _tick_attack(delta: float, startup: float, duration: float) -> bool:
 	return attack_timer <= 0
 
 
-func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false) -> void:
+func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false, causes_knockdown: bool = false) -> void:
 	if state == State.GUARD:
 		if not bypass_guard:
 			return
@@ -152,6 +155,9 @@ func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false) ->
 		guard_cooldown_timer = GUARD_COOLDOWN
 
 	if state == State.KO:
+		return
+	
+	if state == State.KNOCKDOWN:
 		return
 
 	hit_landed.emit()
@@ -176,6 +182,9 @@ func take_damage(amount: int, knockback: Vector3, bypass_guard: bool = false) ->
 		ko_timer = KO_DURATION
 
 		return
+	
+	if causes_knockdown:
+		knockdown_pending = true
 
 	velocity = knockback
 	launched = knockback.y > 0
@@ -251,7 +260,9 @@ func _on_hitbox_area_entered(area: Area3D) -> void:
 		else:
 			victim.hitstop_timer = MOVES[State.FINISHER]["hitstop_duration"]
 
-	victim.take_damage(damage, knockback, state == State.HEAVY)
+	var bypass_guard = state == State.HEAVY
+	var causes_knockdown := state == State.FINISHER and combo_count == 3
+	victim.take_damage(damage, knockback, bypass_guard, causes_knockdown)
 
 
 func _ready() -> void:
@@ -276,6 +287,19 @@ func _ready() -> void:
 		if node is CharacterBody3D and node != self:
 			opponent = node
 			break
+
+
+func _recover_from_hurt() -> void:
+	velocity.x = 0
+	velocity.z = 0
+	launched = false
+
+	if knockdown_pending:
+		knockdown_pending = false
+		knockdown_timer = KNOCKDOWN_DURATION
+		state = State.KNOCKDOWN
+	else:
+		state = State.IDLE
 
 
 func _physics_process(delta: float) -> void:
@@ -398,17 +422,12 @@ func _physics_process(delta: float) -> void:
 						parry_cooldown_timer = PARRY_COOLDOWN
 
 				if is_on_floor() and velocity.y <= 0:
-					velocity.x = 0
-					velocity.z = 0
-					launched = false
-					state = State.IDLE
+					_recover_from_hurt()
 			else:
 				attack_timer -= delta
 
 				if attack_timer <= 0:
-					velocity.x = 0
-					velocity.z = 0
-					state = State.IDLE
+					_recover_from_hurt()
 		State.GUARD:
 			velocity.x = 0
 			velocity.z = 0
@@ -448,6 +467,13 @@ func _physics_process(delta: float) -> void:
 				hp_changed.emit(hp)
 				finisher_meter = 0
 				finisher_meter_changed.emit(finisher_meter)
+				state = State.IDLE
+		State.KNOCKDOWN:
+			velocity.x = 0
+			velocity.z = 0
+			knockdown_timer -= delta
+
+			if knockdown_timer <= 0:
 				state = State.IDLE
 			
 	move_and_slide()
